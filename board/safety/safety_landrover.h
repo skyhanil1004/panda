@@ -13,7 +13,23 @@ int landrover_cruise_engaged_last = 0;
 uint32_t landrover_ts_last = 0;
 struct sample_t landrover_torque_meas;         // last few torques measured
 
-static int landrover_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
+const uint16_t LANDROVER_PARAM_PASSTHROUGH = 1;
+bool landrover_passthrough = false;
+
+const addr_checks landrover_rx_checks = {
+  .check = NULL,
+  .len = 0,
+};
+
+static const addr_checks* landrover_init(int16_t param) {
+  UNUSED(param);
+  landrover_passthrough = GET_FLAG(param, LANDROVER_PARAM_PASSTHROUGH);
+  controls_allowed = true;
+  relay_malfunction_reset();
+  return &landrover_rx_checks;
+}
+
+int landrover_rx_hook(CANPacket_t *to_push) {
   int bus = GET_BUS(to_push);
   int addr = GET_ADDR(to_push);
 
@@ -48,7 +64,7 @@ static int landrover_rx_hook(CAN_FIFOMailBox_TypeDef *to_push) {
   return 1;
 }
 
-static int landrover_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
+static int landrover_tx_hook(CANPacket_t *to_send) {
 
   int tx = 1;
 
@@ -116,14 +132,14 @@ static int landrover_tx_hook(CAN_FIFOMailBox_TypeDef *to_send) {
 #endif
   return tx;
 }
-
+/*
 static void landrover_init(int16_t param) {
   UNUSED(param);
   controls_allowed = 0;
   landrover_camera_detected = 0;
 }
-
-static int landrover_fwd_hook(int bus_num, CAN_FIFOMailBox_TypeDef *to_fwd) {
+*/
+static int landrover_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
 
   int bus_fwd = -1;
   int addr = GET_ADDR(to_fwd);
