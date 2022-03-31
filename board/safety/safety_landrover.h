@@ -5,6 +5,7 @@ const uint32_t LANDROVER_RT_INTERVAL = 250000;  // 250ms between real time check
 const int LANDROVER_MAX_RATE_UP = 25;
 const int LANDROVER_MAX_RATE_DOWN = 30;
 const int LANDROVER_MAX_TORQUE_ERROR = 800;    // max torque cmd in excess of torque motor
+const int LANDROVER_M = 800;    // max torque cmd in excess of torque motor
 
 bool landrover_camera_detected = 0;             // is giraffe switch 2 high?
 int landrover_rt_torque_last = 0;
@@ -21,6 +22,7 @@ const addr_checks landrover_rx_checks = {
   .len = 0,
 };
 
+
 static const addr_checks* landrover_init(int16_t param) {
   UNUSED(param);
   landrover_passthrough = GET_FLAG(param, LANDROVER_PARAM_PASSTHROUGH);
@@ -32,16 +34,6 @@ static const addr_checks* landrover_init(int16_t param) {
 int landrover_rx_hook(CANPacket_t *to_push) {
   int bus = GET_BUS(to_push);
   int addr = GET_ADDR(to_push);
-
-#if 0
-  // Measured eps torque
-  if (addr == 544) {
-    int torque_meas_new = ((GET_BYTE(to_push, 4) & 0x7U) << 8) + GET_BYTE(to_push, 5) - 1024U;
-
-    // update array of samples
-    update_sample(&landrover_torque_meas, torque_meas_new);
-  }
-#endif
 
   // enter controls on rising edge of ACC, exit controls on ACC off
   if (addr == 0x156) {
@@ -120,11 +112,6 @@ static int landrover_tx_hook(CANPacket_t *to_send) {
     }
   }
 
-  // FORCE CANCEL: safety check only relevant when spamming the cancel button.
-  // ensuring that only the cancel button press is sent when controls are off.
-  // This avoids unintended engagements while still allowing resume spam
-  // TODO: fix bug preventing the button msg to be fwd'd on bus 2
-
   // 1 allows the message through
   // tx = 1;    // if 1 then all packet pass, so, do not run else find steer angle.
 #ifdef _TEST_TORQ_
@@ -132,13 +119,7 @@ static int landrover_tx_hook(CANPacket_t *to_send) {
 #endif
   return tx;
 }
-/*
-static void landrover_init(int16_t param) {
-  UNUSED(param);
-  controls_allowed = 0;
-  landrover_camera_detected = 0;
-}
-*/
+
 static int landrover_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
 
   int bus_fwd = -1;
@@ -149,7 +130,6 @@ static int landrover_fwd_hook(int bus_num, CANPacket_t *to_fwd) {
   }
   // forward all messages from camera except LKAS_COMMAND and LKAS_HUD
   if ((bus_num == 2) && !landrover_camera_detected && (addr != 0x28F) && (addr != 0x1D8) && (addr != 0x3D4)) {
-  // if (bus_num == 2) {
     bus_fwd = 0;
   }
   return bus_fwd;
